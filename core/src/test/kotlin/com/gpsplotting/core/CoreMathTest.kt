@@ -37,6 +37,27 @@ class CoreMathTest {
         assertEquals(2, r.center.size)
         // half width 6, 2% -> dz = 0.12
         assertTrue(nearlyEqual(r.left[0].elevation, 100.0 - 0.12, 1e-6))
+        assertEquals(null, r.autoGradeSummary)
+    }
+
+    @Test
+    fun `road builder v2 autograde summary`() {
+        val rows = listOf(
+            SurveyPoint("A", 0.0, 0.0, 100.0, "CEN"),
+            SurveyPoint("B", 0.0, 100.0, 110.0, "CEN"),
+        )
+        val r = RoadBuilder.buildBreaklinesFromSurveyCsv(
+            rows,
+            RoadBuilder.RoadBreaklinesParams(
+                totalWidthFt = 12.0,
+                crossSlopePct = 2.0,
+                codeTag = "cen",
+                autoGrade = AutoGradeParams(0.0, 100.0),
+            ),
+        )
+        assertEquals(100.0, r.center[0].elevation, 1e-6)
+        assertTrue(r.autoGradeSummary != null)
+        assertTrue(r.autoGradeSummary!!.totalLengthFt > 99.0)
     }
 
     @Test

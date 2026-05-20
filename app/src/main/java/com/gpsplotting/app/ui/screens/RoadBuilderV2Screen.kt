@@ -4,8 +4,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,14 +28,17 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.gpsplotting.app.ui.ToolScaffold
 import com.gpsplotting.app.util.AppFiles
+import com.gpsplotting.core.AutoGradeParams
 import com.gpsplotting.core.CsvIo
 import com.gpsplotting.core.DxfWriter
 import com.gpsplotting.core.RoadBuilder
+import com.gpsplotting.core.parseDoubleLenient
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import kotlin.math.roundToInt
 
 @Composable
-fun RoadBuilderScreen(nav: NavHostController) {
+fun RoadBuilderV2Screen(nav: NavHostController) {
     val ctx = LocalContext.current
     var uri by remember { mutableStateOf<Uri?>(null) }
     var width by remember { mutableStateOf("12") }
@@ -43,10 +46,12 @@ fun RoadBuilderScreen(nav: NavHostController) {
     var code by remember { mutableStateOf("CEN") }
     var useAllRows by remember { mutableStateOf(false) }
     var endCaps by remember { mutableStateOf(true) }
+    var minGrade by remember { mutableStateOf("1") }
+    var maxGrade by remember { mutableStateOf("12") }
     var status by remember { mutableStateOf("") }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u -> uri = u }
 
-    ToolScaffold("Road breaklines", nav) { padding ->
+    ToolScaffold("Road Builder V2 (AutoGrade)", nav) { padding ->
         Column(
             Modifier
                 .padding(padding)
@@ -60,11 +65,20 @@ fun RoadBuilderScreen(nav: NavHostController) {
             OutlinedTextField(code, { code = it }, label = { Text("Code filter (blank = all)") }, modifier = Modifier.fillMaxWidth())
             RowSwitch("Use all rows (ignore Code)", useAllRows) { useAllRows = it }
             RowSwitch("End caps", endCaps) { endCaps = it }
+            Spacer(Modifier.height(8.dp))
+            Text("Auto-grade profile", style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
+            OutlinedTextField(minGrade, { minGrade = it }, label = { Text("Min grade (%)") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(maxGrade, { maxGrade = it }, label = { Text("Max grade (%)") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
             Button(
                 onClick = {
                     try {
                         val u = uri ?: error("Pick a CSV first.")
+                        val widthFt = parseDoubleLenient(width) ?: error("Invalid total width.")
+                        val crossPct = parseDoubleLenient(crossSlope) ?: error("Invalid cross-slope.")
+                        val minPct = parseDoubleLenient(minGrade) ?: error("Invalid min grade %.")
+                        val maxPct = parseDoubleLenient(maxGrade) ?: error("Invalid max grade %.")
+                        require(minPct <= maxPct) { "Min grade % must be <= max grade %." }
                         val rows = CsvIo.readSurveyRows(ByteArrayInputStream(AppFiles.readBytes(ctx.contentResolver, u)))
                         val tag = when {
                             useAllRows -> null
@@ -74,14 +88,20 @@ fun RoadBuilderScreen(nav: NavHostController) {
                         val result = RoadBuilder.buildBreaklinesFromSurveyCsv(
                             rows,
                             RoadBuilder.RoadBreaklinesParams(
-                                totalWidthFt = width.toDouble(),
-                                crossSlopePct = crossSlope.toDouble(),
+                                totalWidthFt = widthFt,
+                                crossSlopePct = crossPct,
                                 codeTag = tag,
                                 addEndCaps = endCaps,
+                                autoGrade = AutoGradeParams(
+                                    minGradePct = minPct,
+                                    maxGradePct = maxPct,
+                                ),
                             ),
                         )
+                        val summary = result.autoGradeSummary
+                            ?: error("Auto-grade summary missing.")
                         val stem = AppFiles.safeDisplayName(u).substringBeforeLast('.').ifEmpty { "export" }
-                        val name = "${stem}_breaklines.dxf"
+                        val name = "${stem}_breaklines_v2.dxf"
                         val bytes = ByteArrayOutputStream().also { os ->
                             DxfWriter.writeBreaklinesDxf(
                                 os,
@@ -98,7 +118,16 @@ fun RoadBuilderScreen(nav: NavHostController) {
                             )
                         }.toByteArray()
                         val path = AppFiles.saveBytesToPublicDownloads(ctx, name, bytes, "application/acad")
-                        status = "Saved:\n$path"
+                        val gradeStr = (summary.gradePct * 10.0).roundToInt() / 10.0
+                        val lenStr = (summary.totalLengthFt * 10.0).roundToInt() / 10.0
+                        val dzStr = summary.deltaElevFt
+                        status = buildString {
+                            appendLine("Grade: $gradeStr%")
+                            appendLine("Length: $lenStr ft")
+                            appendLine("ΔZ: $dzStr ft")
+                            appendLine("Saved:")
+                            append(path)
+                        }
                     } catch (e: Exception) {
                         status = e.message ?: e.toString()
                     }

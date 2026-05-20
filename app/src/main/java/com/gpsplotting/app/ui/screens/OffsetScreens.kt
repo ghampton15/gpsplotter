@@ -31,8 +31,7 @@ import com.gpsplotting.core.CsvIo
 import com.gpsplotting.core.OffsetCalculator
 import com.gpsplotting.core.PadOffsetCalculator
 import java.io.ByteArrayInputStream
-import java.io.File
-import java.io.FileOutputStream
+import java.io.ByteArrayOutputStream
 
 @Composable
 fun OffsetScreen(nav: NavHostController) {
@@ -98,17 +97,19 @@ fun OffsetScreen(nav: NavHostController) {
                         when (mode) {
                             0 -> {
                                 val outPts = OffsetCalculator.generateOffsets(rows, dist)
-                                val outFile = File(AppFiles.defaultOutputDir(ctx), "${stem}_offsets.csv")
-                                FileOutputStream(outFile).use { os -> CsvIo.writeOffsetCsv(os, outPts) }
-                                status = "Saved:\n${outFile.absolutePath}"
+                                val name = "${stem}_offsets.csv"
+                                val bytes = ByteArrayOutputStream().also { os -> CsvIo.writeOffsetCsv(os, outPts) }.toByteArray()
+                                val path = AppFiles.saveBytesToPublicDownloads(ctx, name, bytes, "text/csv")
+                                status = "Saved:\n$path"
                             }
                             else -> {
                                 val pads = PadOffsetCalculator.groupByBuildingPrefix(rows, prefix.uppercase())
                                 require(pads.isNotEmpty()) { "No rows with Code starting with ${prefix.uppercase()}" }
                                 val outPts = PadOffsetCalculator.generateOffsets(pads, dist)
-                                val outFile = File(AppFiles.defaultOutputDir(ctx), "${stem}_pad_offsets.csv")
-                                FileOutputStream(outFile).use { os -> CsvIo.writeOffsetCsv(os, outPts) }
-                                status = "Saved:\n${outFile.absolutePath}"
+                                val name = "${stem}_pad_offsets.csv"
+                                val bytes = ByteArrayOutputStream().also { os -> CsvIo.writeOffsetCsv(os, outPts) }.toByteArray()
+                                val path = AppFiles.saveBytesToPublicDownloads(ctx, name, bytes, "text/csv")
+                                status = "Saved:\n$path"
                             }
                         }
                     } catch (e: Exception) {

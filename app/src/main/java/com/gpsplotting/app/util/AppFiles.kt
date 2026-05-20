@@ -15,13 +15,6 @@ import java.io.OutputStream
 
 object AppFiles {
 
-    /** App-accessible Documents/GPSPlotting (see README). */
-    fun defaultOutputDir(context: Context): File {
-        val base = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
-            ?: context.filesDir
-        return File(base, "GPSPlotting").apply { mkdirs() }
-    }
-
     fun readBytes(contentResolver: ContentResolver, uri: Uri): ByteArray =
         contentResolver.openInputStream(uri)!!.use { it.readBytes() }
 
@@ -35,21 +28,31 @@ object AppFiles {
      * API 29+: uses MediaStore (no storage permission). API 26–28: writes to public Download dir
      * ([saveBytesToDownloadsLegacy]) — caller must hold [android.Manifest.permission.WRITE_EXTERNAL_STORAGE].
      */
-    fun saveBytesToPublicDownloads(context: Context, displayName: String, bytes: ByteArray): String {
+    fun saveBytesToPublicDownloads(
+        context: Context,
+        displayName: String,
+        bytes: ByteArray,
+        mimeType: String = "application/octet-stream",
+    ): String {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            saveBytesToDownloadsMediaStore(context, displayName, bytes)
+            saveBytesToDownloadsMediaStore(context, displayName, bytes, mimeType)
         } else {
             saveBytesToDownloadsLegacy(context, displayName, bytes)
         }
     }
 
     /** API 29+ — appears under Downloads in the system file picker / Files app. */
-    fun saveBytesToDownloadsMediaStore(context: Context, displayName: String, bytes: ByteArray): String {
+    fun saveBytesToDownloadsMediaStore(
+        context: Context,
+        displayName: String,
+        bytes: ByteArray,
+        mimeType: String = "application/octet-stream",
+    ): String {
         val resolver = context.contentResolver
         val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val details = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
             put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(MediaStore.MediaColumns.IS_PENDING, 1)

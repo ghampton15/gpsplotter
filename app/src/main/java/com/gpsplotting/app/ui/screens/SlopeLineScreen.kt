@@ -162,7 +162,7 @@ fun SlopeLineScreen(nav: NavHostController) {
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             stakeStatus =
-                                "Saved to Downloads:\n${AppFiles.saveBytesToDownloadsMediaStore(ctx, fileName, bytes)}"
+                                "Saved to Downloads:\n${AppFiles.saveBytesToDownloadsMediaStore(ctx, fileName, bytes, "application/acad")}"
                         } else {
                             val ok = ContextCompat.checkSelfPermission(
                                 ctx,

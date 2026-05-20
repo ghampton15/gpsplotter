@@ -514,7 +514,7 @@ private fun saveLandXmlToDownloads(
     val prefix = if (detail.isNotBlank()) "$detail\n" else ""
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         setStatus(
-            prefix + "Saved to Downloads:\n${AppFiles.saveBytesToDownloadsMediaStore(ctx, fileName, bytes)}",
+            prefix + "Saved to Downloads:\n${AppFiles.saveBytesToDownloadsMediaStore(ctx, fileName, bytes, "application/xml")}",
         )
     } else {
         val ok = ContextCompat.checkSelfPermission(

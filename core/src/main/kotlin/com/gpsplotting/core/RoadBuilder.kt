@@ -69,15 +69,30 @@ object RoadBuilder {
         val layerRight: String = "DRIVEWAY_RIGHT",
         val layerEndCaps: String = "DRIVEWAY_END_CAPS",
         val addEndCaps: Boolean = true,
+        val autoGrade: AutoGradeParams? = null,
     )
 
     fun buildBreaklinesFromSurveyCsv(rows: List<SurveyPoint>, params: RoadBreaklinesParams): RoadBreaklinesResult {
         val raw = filterCenterline(rows, params.codeTag)
-        val center = dedupeConsecutive(raw)
-        require(center.size >= 2) {
+        val centerSurvey = dedupeConsecutive(raw)
+        require(centerSurvey.size >= 2) {
             val hint = if (params.codeTag == null) " (no Code filter)" else " (code=${params.codeTag})"
-            "Need at least two centerline points$hint. Found ${center.size}."
+            "Need at least two centerline points$hint. Found ${centerSurvey.size}."
         }
+        val autoGradeSummary = if (params.autoGrade != null) {
+            val (graded, summary) = applyAutoGradeProfile(centerSurvey, params.autoGrade)
+            buildFromCenter(graded, params, summary)
+        } else {
+            buildFromCenter(centerSurvey, params, null)
+        }
+        return autoGradeSummary
+    }
+
+    private fun buildFromCenter(
+        center: List<Point3>,
+        params: RoadBreaklinesParams,
+        autoGradeSummary: AutoGradeSummary?,
+    ): RoadBreaklinesResult {
         val halfW = params.totalWidthFt / 2.0
         val (left, right) = offsetEdges(center, halfW, params.crossSlopePct)
         return RoadBreaklinesResult(
@@ -89,6 +104,7 @@ object RoadBuilder {
             layerRight = params.layerRight,
             layerEndCaps = params.layerEndCaps,
             addEndCaps = params.addEndCaps,
+            autoGradeSummary = autoGradeSummary,
         )
     }
 
@@ -101,5 +117,6 @@ object RoadBuilder {
         val layerRight: String,
         val layerEndCaps: String,
         val addEndCaps: Boolean,
+        val autoGradeSummary: AutoGradeSummary? = null,
     )
 }

@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import com.gpsplotting.app.ui.screens.HomeDestination
 import com.gpsplotting.app.ui.screens.OffsetScreen
 import com.gpsplotting.app.ui.screens.RoadBuilderScreen
+import com.gpsplotting.app.ui.screens.RoadBuilderV2Screen
 import com.gpsplotting.app.ui.screens.SlopeLineScreen
 import com.gpsplotting.app.ui.screens.SlopingPlaneScreen
 
@@ -40,6 +41,7 @@ fun GpsPlottingApp() {
         composable("home") { HomeScreen(nav) }
         composable("offset") { OffsetScreen(nav) }
         composable("road") { RoadBuilderScreen(nav) }
+        composable("road_v2") { RoadBuilderV2Screen(nav) }
         composable("slope_line") { SlopeLineScreen(nav) }
         composable("sloping_plane") { SlopingPlaneScreen(nav) }
     }
@@ -48,6 +50,7 @@ fun GpsPlottingApp() {
 private val destinations = listOf(
     HomeDestination("offset", "Offsets", "Polygon loop or BLDG_* pad codes"),
     HomeDestination("road", "Road breaklines", "CSV → DXF left/center/right"),
+    HomeDestination("road_v2", "Road Builder V2 (AutoGrade)", "CSV → graded profile → DXF (Downloads)"),
     HomeDestination("slope_line", "Elevation grade", "Rise / run / grade % → DXF stake line"),
     HomeDestination("sloping_plane", "Sloping plane", "LandXML TIN / plane math"),
 )
