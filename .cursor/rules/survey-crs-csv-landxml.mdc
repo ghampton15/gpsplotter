@@ -1,0 +1,56 @@
+---
+description: Survey CSV layout, EPSG/CRS, and LandXML export conventions (Emlid Flow)
+alwaysApply: true
+---
+
+# Survey coordinates, CSV, and LandXML
+
+This app is for **US survey projects** (Georgia default). Coordinates are **passthrough** — no reprojection in app code.
+
+## CSV format (`CsvIo`)
+
+Required columns (headers matched case-insensitively):
+
+- **Easting**, **Northing**, **Elevation** (or `Height`)
+- At least one of **Name** or **Code**
+
+Layouts:
+
+- `Code, Easting, Northing, Elevation` — typical Emlid Flow coded corners
+- `Name, Easting, Northing, Elevation, Code` — full point lists
+
+- Use `parseDoubleLenient` / `normalizeSurveyNumber` for Emlid-style spaced numbers (`424 494.526`).
+- **Never swap E/N** unless the user explicitly asks; column names define meaning.
+
+## Default horizontal CRS
+
+- **EPSG:6445** — NAD83(2011) / Georgia East (**US survey feet**)
+- Not EPSG:6444 (same zone in **meters**)
+- Plan order: **Easting, Northing** then elevation
+
+## LandXML surfaces (`LandXmlWriter`, `LandXmlCrs`)
+
+For Emlid Flow import:
+
+1. Write **`ogcWktCode`** on `<CoordinateSystem>` when WKT is known (6445 is in `LandXmlCrs.kt`) — `epsgCode` alone is not enough for reliable placement.
+2. Use **`linearUnit="USSurveyFoot"`** in `<Imperial>` for ft-US CRS (not `foot`).
+3. `<P>` point order for 6445: **`easting northing elevation`** (`PlanOrder.EastingNorthingElevation`).
+4. Optional vertical: note in `desc` / `verticalDatum` only (avoid numeric `verticalCoordinateSystemName` confusing importers).
+
+5. **Emlid Flow import:** default **do not embed** `<CoordinateSystem>` in LandXML — project CRS (6445) applies to raw E,N,Z. Turn on “Embed CRS in file” only if needed; try “Northing first” if still misplaced.
+
+Do not use **Northing-first** `<P>` order for US State Plane unless the user enables it for troubleshooting.
+
+## Emlid Flow checklist (user-facing bugs)
+
+- Flow project CRS must match export EPSG (default 6445).
+- Surface import is via **Flow 360**; sync to field app.
+- Wrong placement “hundreds of miles away, same state” → usually missing `ogcWktCode`, wrong units (ft vs m), E/N swap in CSV, or wrong EPSG.
+
+## Code touch points
+
+- CSV: `core/.../CsvIo.kt`
+- LandXML: `core/.../LandXmlWriter.kt`, `LandXmlCrs.kt`
+- UI defaults: `app/.../SlopingPlaneScreen.kt` (CRS fields)
+
+When adding CRS support, extend `LandXmlCrs.ogcWktForEpsg()` with full OGC WKT from [epsg.io](https://epsg.io), not only the numeric code.

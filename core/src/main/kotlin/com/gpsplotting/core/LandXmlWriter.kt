@@ -59,7 +59,7 @@ object LandXmlWriter {
         )
         sb.appendLine("  <Units>")
         sb.appendLine(
-            "    <Imperial areaUnit=\"acre\" linearUnit=\"foot\" volumeUnit=\"cubicYard\" " +
+            "    <Imperial areaUnit=\"acre\" linearUnit=\"USSurveyFoot\" volumeUnit=\"cubicYard\" " +
                 "temperatureUnit=\"fahrenheit\" pressureUnit=\"inchHG\"/>",
         )
         sb.appendLine("  </Units>")
@@ -139,11 +139,15 @@ object LandXmlWriter {
             horizontalLabel
         }
         val sb = StringBuilder()
-        sb.append("  <CoordinateSystem epsgCode=\"$horizontalEpsg\"")
+        sb.append("  <CoordinateSystem")
+        val wkt = LandXmlCrs.ogcWktForEpsg(horizontalEpsg)
+        if (wkt != null) {
+            sb.append(" ogcWktCode=\"${xmlEscape(wkt)}\"")
+        }
+        sb.append(" epsgCode=\"$horizontalEpsg\"")
         sb.append(" desc=\"${xmlEscape(desc)}\"")
         if (verticalEpsg != null) {
-            sb.append(" verticalCoordinateSystemName=\"$verticalEpsg\"")
-            sb.append(" verticalDatum=\"${xmlEscape("North American Vertical Datum 1988")}\"")
+            sb.append(" verticalDatum=\"${xmlEscape("NAVD88 (ft US)")}\"")
         }
         sb.append("/>")
         return sb.toString()

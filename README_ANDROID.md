@@ -37,7 +37,11 @@ Use the checklist below on your phone after installing the APK:
 2. **Offset / Pad offsets / Road breaklines**: pick the CSV, run, confirm files appear in `GPSPlotting` folder; import DXF or CSV back into Flow where applicable.
 3. **LandXML surfaces**: export `surface_*.xml` from Sloping plane tools and import as a surface in Flow; verify TIN displays and elevations look sane at a known corner.
 
-If LandXML import fails, confirm coordinate order matches your Flow version (this writer uses **Easting Northing Elevation** in each `<P>`).
+If LandXML import fails, confirm the Flow project uses **EPSG:6445** (ft US), CSV columns are **Easting / Northing** (not swapped), and the XML includes **`ogcWktCode`** and **`USSurveyFoot`** (see `.cursor/rules/survey-crs-csv-landxml.mdc`).
+
+## Agent / contributor notes
+
+Persistent CRS and CSV conventions for Cursor agents: [`.cursor/rules/survey-crs-csv-landxml.mdc`](.cursor/rules/survey-crs-csv-landxml.mdc).
 
 ## Gradle note
 

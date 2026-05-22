@@ -6,9 +6,12 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,6 +38,7 @@ import androidx.activity.result.ActivityResultLauncher
 import com.gpsplotting.app.ui.ToolScaffold
 import com.gpsplotting.app.util.AppFiles
 import com.gpsplotting.core.CsvIo
+import com.gpsplotting.core.LandXmlCrs
 import com.gpsplotting.core.LandXmlWriter
 import com.gpsplotting.core.Point3
 import com.gpsplotting.core.SlopingPlane
@@ -58,6 +63,10 @@ fun SlopingPlaneScreen(nav: NavHostController) {
     /** NAVD88 orthometric heights in ft US — EPSG 6360 per epsg.io/6360 (GEOID18 applied when surveying Z). */
     var verticalCrsEpsg by remember { mutableStateOf("6360") }
     var verticalCrsDesc by remember { mutableStateOf("NAVD88 height (ft US), GEOID18") }
+    /** Off = raw ENZ in file; Flow project CRS must be 6445 (recommended for Emlid). */
+    var embedCrsInLandXml by remember { mutableStateOf(false) }
+    /** Only if embed CRS on: some tools expect northing before easting in each P element. */
+    var landXmlNorthingFirst by remember { mutableStateOf(false) }
 
     // Survey CSV → four coded points, A/B direction, target grade
     var csvUri by remember { mutableStateOf<Uri?>(null) }
@@ -144,8 +153,9 @@ fun SlopingPlaneScreen(nav: NavHostController) {
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "LandXML needs horizontal CRS (EPSG 6445) and vertical CRS for elevations. Points are ENZ in ft US. " +
-                    "GEOID18 is applied in Emlid when collecting Z; EPSG 6360 is NAVD88 height in US survey feet.",
+                "LandXML points are easting, northing, elevation (ft US). " +
+                    "Set your Emlid Flow project to EPSG 6445 before import. " +
+                    "If the surface appears far away, leave “Embed CRS in file” off.",
             )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
@@ -181,6 +191,16 @@ fun SlopingPlaneScreen(nav: NavHostController) {
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
+            RowSwitch(
+                "Embed CRS in LandXML file",
+                embedCrsInLandXml,
+            ) { embedCrsInLandXml = it }
+            if (embedCrsInLandXml) {
+                RowSwitch(
+                    "Northing first in file (try if misplaced)",
+                    landXmlNorthingFirst,
+                ) { landXmlNorthingFirst = it }
+            }
             Spacer(Modifier.height(12.dp))
 
             when (tab) {
@@ -275,7 +295,16 @@ fun SlopingPlaneScreen(nav: NavHostController) {
                                     val epsg = parseCrsEpsg(crsEpsg)
                                     val desc = crsDesc.trim().takeIf { it.isNotEmpty() }
                                     val (vEpsg, vDesc) = verticalCrsArgs(verticalCrsEpsg, verticalCrsDesc)
-                                    val bytes = landXmlQuadBytes("SurveyCsvPlane", corners, epsg, desc, vEpsg, vDesc)
+                                    val bytes = landXmlQuadBytes(
+                                        "SurveyCsvPlane",
+                                        corners,
+                                        epsg,
+                                        desc,
+                                        vEpsg,
+                                        vDesc,
+                                        embedCrsInLandXml,
+                                        landXmlNorthingFirst,
+                                    )
                                     val detail =
                                         "Azimuth A→B: ${"%.4f".format(azimuth)}° CW from N\n" +
                                             "Est. max grade ${"%.3f".format(plane.maxGradePercent())}%"
@@ -320,7 +349,16 @@ fun SlopingPlaneScreen(nav: NavHostController) {
                                 val epsg = parseCrsEpsg(crsEpsg)
                                 val desc = crsDesc.trim().takeIf { it.isNotEmpty() }
                                 val (vEpsg, vDesc) = verticalCrsArgs(verticalCrsEpsg, verticalCrsDesc)
-                                val bytes = landXmlQuadBytes("Fix3Plane", r.cornersZComputed, epsg, desc, vEpsg, vDesc)
+                                val bytes = landXmlQuadBytes(
+                                    "Fix3Plane",
+                                    r.cornersZComputed,
+                                    epsg,
+                                    desc,
+                                    vEpsg,
+                                    vDesc,
+                                    embedCrsInLandXml,
+                                    landXmlNorthingFirst,
+                                )
                                 val detail =
                                     "Plane Z at free corner: ${"%.3f".format(r.planeZ)} (meas ${"%.3f".format(r.measuredZ)}), Δ ${"%.3f".format(r.deltaZ)}\n" +
                                         "Max slope ~ ${"%.3f".format(r.plane.maxGradePercent())}%"
@@ -375,7 +413,16 @@ fun SlopingPlaneScreen(nav: NavHostController) {
                                 val epsg = parseCrsEpsg(crsEpsg)
                                 val desc = crsDesc.trim().takeIf { it.isNotEmpty() }
                                 val (vEpsg, vDesc) = verticalCrsArgs(verticalCrsEpsg, verticalCrsDesc)
-                                val bytes = landXmlQuadBytes("TargetPlane", pts, epsg, desc, vEpsg, vDesc)
+                                val bytes = landXmlQuadBytes(
+                                    "TargetPlane",
+                                    pts,
+                                    epsg,
+                                    desc,
+                                    vEpsg,
+                                    vDesc,
+                                    embedCrsInLandXml,
+                                    landXmlNorthingFirst,
+                                )
                                 val detail = "Est. max grade ${"%.3f".format(plane.maxGradePercent())}%"
                                 saveLandXmlToDownloads(
                                     ctx,
@@ -440,6 +487,8 @@ fun SlopingPlaneScreen(nav: NavHostController) {
                                     desc,
                                     vEpsg,
                                     vDesc,
+                                    embedCrsInLandXml,
+                                    landXmlNorthingFirst,
                                 )
                                 saveLandXmlToDownloads(
                                     ctx,
@@ -487,20 +536,39 @@ private fun landXmlQuadBytes(
     crsDescription: String?,
     verticalEpsgCode: Int?,
     verticalCrsDescription: String?,
+    embedCrs: Boolean,
+    northingFirst: Boolean,
 ): ByteArray =
     ByteArrayOutputStream().also {
+        val planOrder = if (northingFirst) {
+            LandXmlWriter.PlanOrder.NorthingEastingElevation
+        } else {
+            LandXmlWriter.PlanOrder.EastingNorthingElevation
+        }
         LandXmlWriter.writeQuadTin(
             it,
             surfaceName,
             corners,
             "GPSPlotting",
-            epsgCode,
+            if (embedCrs) epsgCode else null,
             crsDescription,
-            verticalEpsgCode,
+            if (embedCrs) verticalEpsgCode else null,
             verticalCrsDescription,
-            LandXmlWriter.PlanOrder.EastingNorthingElevation,
+            planOrder,
         )
     }.toByteArray()
+
+@Composable
+private fun RowSwitch(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
 
 private fun saveLandXmlToDownloads(
     ctx: Context,

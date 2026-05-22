@@ -85,17 +85,40 @@ class CoreMathTest {
     }
 
     @Test
-    fun `landxml roundtrip bytes`() {
+    fun `landxml georgia east includes wkt and survey feet`() {
         val out = ByteArrayOutputStream()
         val pts = listOf(
-            Point3(1.0, 2.0, 3.0),
-            Point3(4.0, 5.0, 6.0),
-            Point3(7.0, 8.0, 9.0),
+            Point3(924513.0, 378358.0, 326.5),
+            Point3(924570.0, 378302.0, 327.0),
+            Point3(924513.0, 378358.0, 327.0),
         )
-        LandXmlWriter.writeTinSurface(out, "T", pts, listOf(intArrayOf(1, 2, 3)))
+        LandXmlWriter.writeTinSurface(
+            out,
+            "T",
+            pts,
+            listOf(intArrayOf(1, 2, 3)),
+            epsgCode = 6445,
+            verticalEpsgCode = 6360,
+        )
         val xml = out.toString(StandardCharsets.UTF_8)
         assertTrue(xml.contains("LandXML"))
-        assertTrue(xml.contains("USSurveyFoot"))
+        assertTrue(xml.contains("linearUnit=\"USSurveyFoot\""))
+        assertTrue(xml.contains("ogcWktCode="))
+        assertTrue(xml.contains("epsgCode=\"6445\""))
+        assertTrue(xml.contains("924513.000000 378358.000000 326.500000"))
+    }
+
+    @Test
+    fun `landxml without embedded crs has no coordinate system`() {
+        val out = ByteArrayOutputStream()
+        val pts = listOf(
+            Point3(924513.0, 378358.0, 326.5),
+            Point3(924570.0, 378302.0, 327.0),
+            Point3(924513.0, 378358.0, 327.0),
+        )
+        LandXmlWriter.writeTinSurface(out, "T", pts, listOf(intArrayOf(1, 2, 3)), epsgCode = null)
+        val xml = out.toString(StandardCharsets.UTF_8)
+        assertTrue(!xml.contains("<CoordinateSystem"))
     }
 
     @Test

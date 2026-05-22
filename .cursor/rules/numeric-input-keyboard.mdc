@@ -1,0 +1,66 @@
+---
+description: Use decimal/number keyboards on numeric-only form fields (all UI stacks)
+alwaysApply: true
+---
+
+# Numeric input keyboards
+
+When adding or editing **number-only** fields (dimensions, grades, percentages, elevations, counts, coordinates as typed values, etc.), set the platform keyboard to **numeric** or **decimal** by default. Do not leave the default text keyboard unless the field also accepts letters.
+
+## When this applies
+
+- Labels/units imply numbers: ft, %, grade, slope, width, elevation, chainage, angle (numeric), etc.
+- `parseDouble`, `toInt`, `KeyboardType`, or validation expecting numeric input
+- **Not** for: names, codes, CSV paths, search, passwords, free text notes
+
+## Platform defaults
+
+### Jetpack Compose (Android/Kotlin)
+
+```kotlin
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+
+OutlinedTextField(
+    value = value,
+    onValueChange = onValueChange,
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+)
+```
+
+- Use **`KeyboardType.Decimal`** when values can include a decimal point (grades, feet, %).
+- Use **`KeyboardType.Number`** only for integers (counts, whole feet if no fractions).
+
+### Web (HTML / React / Vue)
+
+```html
+<input type="number" inputmode="decimal" step="any" />
+```
+
+```tsx
+<input type="number" inputMode="decimal" step="any" />
+```
+
+### React Native
+
+```tsx
+<TextInput keyboardType="decimal-pad" />
+```
+
+### Flutter
+
+```dart
+keyboardType: const TextInputType.numberWithOptions(decimal: true),
+```
+
+### SwiftUI (iOS)
+
+```swift
+.keyboardType(.decimalPad) // or .numberPad for integers
+```
+
+## Checklist for agents
+
+- [ ] Every new numeric `TextField` / `OutlinedTextField` / `<input>` has an explicit numeric `keyboardType` / `keyboardOptions` / `inputMode`
+- [ ] Prefer **decimal** when the parser accepts floats (`parseDouble`, `0.3`, `12.5`)
+- [ ] Apply the same keyboard to related fields in one form (e.g. min grade, max grade, width, cross-slope)
