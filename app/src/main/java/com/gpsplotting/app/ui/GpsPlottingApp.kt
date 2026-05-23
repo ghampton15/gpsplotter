@@ -49,7 +49,7 @@ fun GpsPlottingApp() {
 }
 
 private val destinations = listOf(
-    HomeDestination("offset", "Offsets", "offset 4 corners"),
+    HomeDestination("offset", "Offsets", "building pads, line offset"),
     HomeDestination("road", "Road Builder V1", "centerline + cross slope %"),
     HomeDestination("road_v2", "Road Builder V2", "V1 + autograde profile"),
     HomeDestination("slope_line", "Slope Calc", "rise/run"),

@@ -69,13 +69,18 @@ object PadOffsetCalculator {
         return Math.toDegrees(kotlin.math.atan2(dy, dx))
     }
 
-    fun offsetOutward(corner: SurveyPoint, oppositeCorner: SurveyPoint, distance: Double): SurveyPoint {
+    fun offsetOutward(
+        corner: SurveyPoint,
+        oppositeCorner: SurveyPoint,
+        distance: Double,
+        suffixIndex: Int = 0,
+    ): SurveyPoint {
         val diagonalDeg = calculateDiagonalDirectionDegrees(corner, oppositeCorner)
         val angleRad = Math.toRadians(diagonalDeg + 180.0)
         val dx = cos(angleRad)
         val dy = sin(angleRad)
         return SurveyPoint(
-            pointName = corner.pointName + "_OFFSET",
+            pointName = padOffsetPointName(corner.pointName, suffixIndex),
             easting = roundFeet3(corner.easting + dx * distance),
             northing = roundFeet3(corner.northing + dy * distance),
             elevation = roundFeet3(corner.elevation),
@@ -83,16 +88,54 @@ object PadOffsetCalculator {
         )
     }
 
+    fun generateOffsetRing(
+        padPoints: List<SurveyPoint>,
+        padCode: String,
+        distance: Double,
+        suffixIndex: Int = 0,
+    ): List<SurveyPoint> {
+        val n = padPoints.size
+        require(n >= 4) { "Pad $padCode needs at least 4 corner points in order (got $n)." }
+        return List(n) { i ->
+            val opposite = padPoints[(i + 2) % n]
+            offsetOutward(padPoints[i], opposite, distance, suffixIndex)
+        }
+    }
+
+    /**
+     * One polyline per pad per setback layer (OS_1 / OS_2). [setback2Feet] null = single ring only.
+     */
+    fun buildPadOffsetPolylines(
+        pads: Map<String, List<SurveyPoint>>,
+        setback1Feet: Double,
+        setback2Feet: Double?,
+    ): List<Pair<String, List<SurveyPoint>>> {
+        val out = mutableListOf<Pair<String, List<SurveyPoint>>>()
+        for ((code, padPoints) in pads) {
+            out.add("OS_1" to generateOffsetRing(padPoints, code, setback1Feet, suffixIndex = 1))
+            if (setback2Feet != null) {
+                out.add("OS_2" to generateOffsetRing(padPoints, code, setback2Feet, suffixIndex = 2))
+            }
+        }
+        return out
+    }
+
     fun generateOffsets(pads: Map<String, List<SurveyPoint>>, distance: Double): List<SurveyPoint> {
         val all = mutableListOf<SurveyPoint>()
         for ((code, padPoints) in pads) {
-            val n = padPoints.size
-            require(n >= 4) { "Pad $code needs at least 4 corner points in order (got $n)." }
-            for (i in 0 until n) {
-                val opposite = padPoints[(i + 2) % n]
-                all.add(offsetOutward(padPoints[i], opposite, distance))
-            }
+            all.addAll(generateOffsetRing(padPoints, code, distance, suffixIndex = 0))
         }
         return all
+    }
+
+    private fun padOffsetPointName(name: String, suffixIndex: Int): String {
+        val base = name
+            .removeSuffix("_OFFSET")
+            .removeSuffix("_offset1")
+            .removeSuffix("_offset2")
+        return when (suffixIndex) {
+            0 -> "${base}_OFFSET"
+            else -> "${base}_offset$suffixIndex"
+        }
     }
 }
