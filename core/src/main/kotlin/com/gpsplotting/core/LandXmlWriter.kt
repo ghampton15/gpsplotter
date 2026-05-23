@@ -40,6 +40,8 @@ object LandXmlWriter {
         verticalEpsgCode: Int? = null,
         verticalCrsDescription: String? = null,
         planOrder: PlanOrder = PlanOrder.EastingNorthingElevation,
+        planShiftEastingFt: Double = 0.0,
+        planShiftNorthingFt: Double = 0.0,
     ) {
         require(points.isNotEmpty()) { "Surface needs at least one point." }
 
@@ -58,8 +60,9 @@ object LandXmlWriter {
                 "readOnly=\"false\">",
         )
         sb.appendLine("  <Units>")
+        val linearUnit = if (epsgCode != null) "USSurveyFoot" else "foot"
         sb.appendLine(
-            "    <Imperial areaUnit=\"acre\" linearUnit=\"USSurveyFoot\" volumeUnit=\"cubicYard\" " +
+            "    <Imperial areaUnit=\"acre\" linearUnit=\"$linearUnit\" volumeUnit=\"cubicYard\" " +
                 "temperatureUnit=\"fahrenheit\" pressureUnit=\"inchHG\"/>",
         )
         sb.appendLine("  </Units>")
@@ -74,9 +77,11 @@ object LandXmlWriter {
         for (i in points.indices) {
             val p = points[i]
             val id = i + 1
+            val e = p.easting + planShiftEastingFt
+            val n = p.northing + planShiftNorthingFt
             val (c1, c2) = when (planOrder) {
-                PlanOrder.EastingNorthingElevation -> p.easting to p.northing
-                PlanOrder.NorthingEastingElevation -> p.northing to p.easting
+                PlanOrder.EastingNorthingElevation -> e to n
+                PlanOrder.NorthingEastingElevation -> n to e
             }
             sb.appendLine(
                 "          <P id=\"$id\">${formatCoord(c1)} ${formatCoord(c2)} ${formatCoord(p.elevation)}</P>",
@@ -107,6 +112,8 @@ object LandXmlWriter {
         verticalEpsgCode: Int? = null,
         verticalCrsDescription: String? = null,
         planOrder: PlanOrder = PlanOrder.EastingNorthingElevation,
+        planShiftEastingFt: Double = 0.0,
+        planShiftNorthingFt: Double = 0.0,
     ) {
         require(quadCorners.size == 4) { "Need 4 corner points." }
         val (f1, f2) = SlopingPlane.triangulateQuad(quadCorners)
@@ -121,6 +128,8 @@ object LandXmlWriter {
             verticalEpsgCode,
             verticalCrsDescription,
             planOrder,
+            planShiftEastingFt,
+            planShiftNorthingFt,
         )
     }
 

@@ -27,6 +27,132 @@ data class PlaneModel(
 
 object SlopingPlane {
 
+    const val MATCH_CORNER_CODE = "Match"
+
+    enum class PadSurfaceMode {
+        /** Four corners keep surveyed Z (quad TIN). */
+        MatchCorners,
+        /** Constant grade; 0 or 1 Match tie-in. */
+        SlopingPlane,
+    }
+
+    data class BuildPadSurfaceResult(
+        val corners: List<Point3>,
+        val detailLines: List<String>,
+        val plane: PlaneModel? = null,
+        val azimuthDegClockwiseFromNorth: Double? = null,
+    )
+
+    fun isMatchCornerCode(code: String): Boolean =
+        code.trim().equals(MATCH_CORNER_CODE, ignoreCase = true)
+
+    fun surveyCornersToPoint3(corners: List<SurveyPoint>): List<Point3> =
+        corners.map {
+            Point3(roundFeet3(it.easting), roundFeet3(it.northing), roundFeet3(it.elevation))
+        }
+
+    /** Plane through [through] with grade % along [azimuthDegClockwiseFromNorth]. */
+    fun planeThroughPointWithGrade(
+        through: Point3,
+        azimuthDegClockwiseFromNorth: Double,
+        gradePercent: Double,
+    ): PlaneModel = planeFromAnchorSingleSlope(through, azimuthDegClockwiseFromNorth, gradePercent)
+
+    fun buildPadSurfaceCorners(
+        corners: List<SurveyPoint>,
+        start: SurveyPoint?,
+        end: SurveyPoint?,
+        gradePercent: Double,
+        mode: PadSurfaceMode,
+    ): BuildPadSurfaceResult {
+        require(corners.size == 4) { "Need exactly four pad corners." }
+        val matchCount = corners.count { isMatchCornerCode(it.code) }
+        when (matchCount) {
+            2, 3 -> error(
+                "Use four Match corners, or one Match with slope A, slope B, and grade %.",
+            )
+        }
+        return when (mode) {
+            PadSurfaceMode.MatchCorners -> buildMatchCorners(corners)
+            PadSurfaceMode.SlopingPlane -> buildSlopingPlane(corners, start, end, gradePercent, matchCount)
+        }
+    }
+
+    private fun buildMatchCorners(corners: List<SurveyPoint>): BuildPadSurfaceResult {
+        require(corners.all { isMatchCornerCode(it.code) }) {
+            "Match corners mode requires all four corners coded $MATCH_CORNER_CODE."
+        }
+        val pts = surveyCornersToPoint3(corners)
+        val warnings = coplanarityWarning(pts)
+        return BuildPadSurfaceResult(
+            corners = pts,
+            detailLines = listOf("Surface: surveyed Z at all four corners (quad TIN).") + warnings,
+        )
+    }
+
+    private fun buildSlopingPlane(
+        corners: List<SurveyPoint>,
+        start: SurveyPoint?,
+        end: SurveyPoint?,
+        gradePercent: Double,
+        matchCount: Int,
+    ): BuildPadSurfaceResult {
+        val a = start ?: error("slope A is required for sloping plane export.")
+        val b = end ?: error("slope B is required for sloping plane export.")
+        val anchorPt = Point3(a.easting, a.northing, a.elevation)
+        val endPt = Point3(b.easting, b.northing, b.elevation)
+        val azimuth = inverseAzimuthDegrees(anchorPt, endPt)
+        val ens = corners.map { it.easting to it.northing }
+        val plane = when (matchCount) {
+            0 -> planeFromAnchorSingleSlope(anchorPt, azimuth, gradePercent)
+            1 -> {
+                val matchPt = corners.single { isMatchCornerCode(it.code) }
+                planeThroughPointWithGrade(
+                    Point3(matchPt.easting, matchPt.northing, matchPt.elevation),
+                    azimuth,
+                    gradePercent,
+                )
+            }
+            else -> error(
+                "Use four Match corners, or one Match with slope A, slope B, and grade %.",
+            )
+        }
+        val cornerPts = cornersWithPlaneZ(ens, plane)
+        val modeLabel = if (matchCount == 0) {
+            "Sloping plane from slope A"
+        } else {
+            "Plane through Match tie-in"
+        }
+        return BuildPadSurfaceResult(
+            corners = cornerPts,
+            detailLines = listOf(
+                modeLabel,
+                "Azimuth A→B: ${"%.4f".format(azimuth)}° CW from N",
+                "Grade: ${"%.3f".format(plane.maxGradePercent())}%",
+            ),
+            plane = plane,
+            azimuthDegClockwiseFromNorth = azimuth,
+        )
+    }
+
+    private fun coplanarityWarning(corners: List<Point3>): List<String> {
+        if (corners.size < 4) return emptyList()
+        return try {
+            val plane = fitPlaneThroughThreePoints(corners[0], corners[1], corners[2])
+            val maxDelta = corners.maxOf { kotlin.math.abs(plane.zAt(it) - it.elevation) }
+            if (maxDelta > 0.05) {
+                listOf(
+                    "Corners are not quite coplanar (max ΔZ ${"%.3f".format(maxDelta)} ft); " +
+                        "TIN uses two flat triangles.",
+                )
+            } else {
+                emptyList()
+            }
+        } catch (_: IllegalArgumentException) {
+            emptyList()
+        }
+    }
+
     /** Fit Z = a*E + b*N + c through three non-collinear points (unique plane unless degenerate). */
     fun fitPlaneThroughThreePoints(p1: Point3, p2: Point3, p3: Point3): PlaneModel =
         solvePlaneLinear(

@@ -47,4 +47,21 @@ object SlopeLine {
         pts.add(end)
         return StakeResult(pts)
     }
+
+    /**
+     * Line from [start] to [end] plan position with elevation at start from survey.
+     * [gradePercent] is signed along start → end (+ rises toward end, − falls toward end).
+     */
+    fun stakeBetweenPoints(
+        start: Point3,
+        end: Point3,
+        gradePercent: Double,
+        stationIntervalFt: Double? = null,
+    ): StakeResult {
+        val runFt = horizontalDistance(start, end)
+        require(runFt > 1e-9) { "Start and end have the same plan position (zero run)." }
+        val riseFt = runFt * (gradePercent / 100.0)
+        val azimuth = inverseAzimuthDegrees(start, end)
+        return stake(start, azimuth, runFt, riseFt, stationIntervalFt)
+    }
 }

@@ -3,6 +3,7 @@ package com.gpsplotting.app.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,11 +49,11 @@ fun GpsPlottingApp() {
 }
 
 private val destinations = listOf(
-    HomeDestination("offset", "Offsets", "Polygon loop or BLDG_* pad codes"),
-    HomeDestination("road", "Road breaklines", "CSV → DXF left/center/right"),
-    HomeDestination("road_v2", "Road Builder V2 (AutoGrade)", "CSV → graded profile → DXF (Downloads)"),
-    HomeDestination("slope_line", "Elevation grade", "Rise / run / grade % → DXF stake line"),
-    HomeDestination("sloping_plane", "Sloping plane", "LandXML TIN / plane math"),
+    HomeDestination("offset", "Offsets", "offset 4 corners"),
+    HomeDestination("road", "Road Builder V1", "centerline + cross slope %"),
+    HomeDestination("road_v2", "Road Builder V2", "V1 + autograde profile"),
+    HomeDestination("slope_line", "Slope Calc", "rise/run"),
+    HomeDestination("sloping_plane", "Sloping plane", "surface generator"),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,6 +94,7 @@ private fun HomeScreen(nav: NavHostController) {
 fun ToolScaffold(
     title: String,
     nav: NavHostController,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -104,6 +106,7 @@ fun ToolScaffold(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = actions,
             )
         },
         content = content,
